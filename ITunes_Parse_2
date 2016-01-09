@@ -1,0 +1,165 @@
+package sax;
+
+import javax.xml.parsers.SAXParser;
+import javax.xml.parsers.SAXParserFactory;
+import javax.xml.parsers.ParserConfigurationException;
+
+import org.xml.sax.Attributes;
+import org.xml.sax.SAXException;
+import org.xml.sax.helpers.DefaultHandler;
+
+import java.util.HashMap;
+import java.util.Map;
+
+import java.io.IOException;
+
+	private void parseITunesXML() {
+
+		/*get a factory*/
+		SAXParserFactory spf = SAXParserFactory.newInstance();
+		try 
+		{
+			/*get a new instance of parser*/
+			SAXParser sp = spf.newSAXParser();
+			/*parse the file and also register this class for call backs*/
+			sp.parse("\\iTunes Library.xml", this);
+		}
+		catch(SAXException se) 
+			{
+				se.printStackTrace();
+			}
+		catch(ParserConfigurationException pce) 
+			{
+				pce.printStackTrace();
+			}
+		catch (IOException ie) 
+			{
+				ie.printStackTrace();
+			}
+	}
+
+/*Starting Element*/	
+@Override
+   public void startDocument() throws SAXException {
+            p("starting document");
+        }
+/*Going down the three levels of "dict" to the info needed*/
+@Override
+    public void startElement(String uri, String localName, String qName, Attributes attributes) throws SAXException {
+            if("dict".equals(qName)) 
+            	{
+                	dictLevel++;
+            	}
+            if("key".equals(qName)) 
+            	{
+               		insideKey = true;
+            	}
+            if("dict".equals(qName) && dictLevel == 2 && nextIsTracks) 
+            	{
+	                p("starting tracks");
+	                doingTracks = true;
+	                nextIsTracks = false;
+            	}
+            if("dict".equals(qName) && dictLevel == 2 && nextIsPlaylists) 
+            	{
+	                p("starting tracks");
+	                doingPlaylists = true;
+	                nextIsPlaylists = false;
+            	}
+            if("dict".equals(qName) && dictLevel == 3 && doingTracks)
+            	{
+                	insideTrack = true;
+                	currentTrack = new Track();
+           		}
+            if("dict".equals(qName) && dictLevel == 2 && doingPlaylists) 
+            	{
+                	insidePlaylist = true;
+                	currentPlaylist = new Playlist();
+            	}
+            currentQname = qName;
+
+            /*if(insidePlaylist && currentPlaylist != null) 
+            		{
+               		 	if("Folder".equals(currentKey)) 
+               		 	{
+                    		p("inside a folder");
+                    		if("true".equals(qName)) 
+                    			{
+                        			p("it is a folder!");
+                        			currentPlaylist = null;
+                    			}
+                		}
+            		}*/
+        }
+
+	public void characters(char[] ch, int start, int length) throws SAXException {
+		tempVal = new String(ch,start,length);
+	}
+
+	public void endElement(String uri, String localName,
+		String qName) throws SAXException {
+
+		if(qName.equalsIgnoreCase("Name")) 
+		{
+			/*add it to the list*/
+			/**LibraryList.add(tempTrack);**/
+		}
+		else if (qName.equalsIgnoreCase("Artist")) 
+		{
+			tempTrack.setArtist(tempVal);
+		}
+		else if (qName.equalsIgnoreCase("Persistent Id")) 
+		{
+			tempTrack.setPersistentId(Integer.parseInt(tempVal));
+		}
+		else if (qName.equalsIgnoreCase("Album")) 
+		{
+			tempTrack.setAlbum(Integer.parseInt(tempVal));
+		}
+
+	}
+/*This??*/
+@Override
+     public void endElement(String uri, String localName, String qName) throws SAXException {
+            if("dict".equals(qName)) {
+                if(dictLevel == 2) {
+                    doingTracks = false;
+                }
+                dictLevel--;
+                if(insideTrack && currentTrack != null) {
+                    if(currentTrack.getArtist() != null) {
+                    db.addTrack(currentTrack);
+                    db.addTrackToArtist(currentTrack);
+                    db.artistMap.put(currentTrack.getArtist(),currentTrack);
+                    }
+                    currentTrack = null;
+                }
+                insideTrack = false;
+                if(insidePlaylist && currentPlaylist != null && dictLevel == 1) {
+                    db.playlists.add(currentPlaylist);
+                    currentPlaylist = null;
+                }
+            }
+            if("key".equals(qName)) {
+                insideKey = false;
+            }
+        }
+	
+/* Print data for checks*/	
+	private void printData(){
+
+		System.out.println("No of Tracks '" + LibraryList.size() + "'.");
+
+		Iterator it = LibraryList.iterator();
+		while(it.hasNext()) {
+			System.out.println(it.next().toString());
+		}
+	}
+	
+/*Run the parser*/
+
+public void run()
+{
+	parseITunesXML();
+}
+        
